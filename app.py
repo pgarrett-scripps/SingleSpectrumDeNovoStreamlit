@@ -173,19 +173,21 @@ if result.returncode == 0:
         st.code(result.stdout)
         st.code(result.stderr)
 
-    # Display the output file
-    with open(output_file_path, 'r') as f:
-        st.text(f"Contents of output:")
-        mz_tab_content = f.read()
 else:
     st.error("Error running casanovo:")
 
     with st.expander("casanovo output"):
         st.code(result.stdout)
         st.code(result.stderr)
-        st.code(mz_tab_content)
 
-    st.stop()
+
+# Display the output file
+with open(output_file_path, 'r') as f:
+    st.text(f"Contents of output:")
+    mz_tab_content = f.read()
+    st.code(mz_tab_content)
+
+
 
 
 # Extract only the lines starting with 'PSM'
