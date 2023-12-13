@@ -143,6 +143,11 @@ with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as yaml
     yaml_file.write(updated_config)
 
 
+with st.expander("files"):
+    st.code(open(yaml_file_path, 'r').read())
+    st.code(open(mgf_file_path, 'r').read())
+
+
 # Generate a temporary file name for the output (without creating a directory)
 output_file_path = str(uuid4().hex) + '.mztab'
 
