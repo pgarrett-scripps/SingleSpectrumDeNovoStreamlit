@@ -1,15 +1,129 @@
+import datetime
+import logging
 import os
 import subprocess
+import sys
 import tempfile
 import urllib
 from io import StringIO
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from uuid import uuid4
 
+import github
 import pandas as pd
 import streamlit as st
 import yaml
+from casanovo import casanovo
+from casanovo.config import Config
+from casanovo.data import ms_io
+from casanovo.denovo import model_runner
 from msms_compression import SpectrumCompressorUrlLzstring
+from casanovo.casanovo import _get_model_weights
+from pytorch_lightning.lite import LightningLite
+
+logger = logging.getLogger("casanovo")
+
+
+def run_casanovo(
+    mode: str,
+    model: Optional[str],
+    peak_path: str,
+    peak_path_val: Optional[str],
+    config: Optional[str],
+    output: Optional[str],
+):
+    """
+    \b
+    Casanovo: De novo mass spectrometry peptide sequencing with a transformer model.
+    ================================================================================
+
+    Yilmaz, M., Fondrie, W. E., Bittremieux, W., Oh, S. & Noble, W. S. De novo
+    mass spectrometry peptide sequencing with a transformer model. Proceedings
+    of the 39th International Conference on Machine Learning - ICML '22 (2022)
+    doi:10.1101/2022.02.07.479481.
+
+    Official code website: https://github.com/Noble-Lab/casanovo
+    """
+    if output is None:
+        output = os.path.join(
+            os.getcwd(),
+            f"casanovo_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}",
+        )
+    else:
+        basename, ext = os.path.splitext(os.path.abspath(output))
+        output = basename if ext.lower() in (".log", ".mztab") else output
+
+    # Configure logging.
+    logging.captureWarnings(True)
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
+    log_formatter = logging.Formatter(
+        "{asctime} {levelname} [{name}/{processName}] {module}.{funcName} : "
+        "{message}",
+        style="{",
+    )
+    console_handler = logging.StreamHandler(sys.stderr)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(log_formatter)
+    root.addHandler(console_handler)
+    file_handler = logging.FileHandler(f"{output}.log")
+    file_handler.setFormatter(log_formatter)
+    root.addHandler(file_handler)
+    # Disable dependency non-critical log messages.
+    logging.getLogger("depthcharge").setLevel(logging.INFO)
+    logging.getLogger("github").setLevel(logging.WARNING)
+    logging.getLogger("h5py").setLevel(logging.WARNING)
+    logging.getLogger("numba").setLevel(logging.WARNING)
+    logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
+    logging.getLogger("torch").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+    # Read parameters from the config file.
+    config = Config(config)
+
+    LightningLite.seed_everything(seed=config["random_seed"], workers=True)
+
+    # Download model weights if these were not specified (except when training).
+    if model is None and mode != "train":
+        try:
+            model = _get_model_weights()
+        except github.RateLimitExceededException:
+            logger.error(
+                "GitHub API rate limit exceeded while trying to download the "
+                "model weights. Please download compatible model weights "
+                "manually from the official Casanovo code website "
+                "(https://github.com/Noble-Lab/casanovo) and specify these "
+                "explicitly using the `--model` parameter when running "
+                "Casanovo."
+            )
+            raise PermissionError(
+                "GitHub API rate limit exceeded while trying to download the "
+                "model weights"
+            ) from None
+
+    # Log the active configuration.
+    logger.info("Casanovo version %s", str(casanovo.__version__))
+    logger.debug("mode = %s", mode)
+    logger.debug("model = %s", model)
+    logger.debug("peak_path = %s", peak_path)
+    logger.debug("peak_path_val = %s", peak_path_val)
+    logger.debug("config = %s", config.file)
+    logger.debug("output = %s", output)
+    for key, value in config.items():
+        logger.debug("%s = %s", str(key), str(value))
+
+    # Run Casanovo in the specified mode.
+    if mode == "denovo":
+        logger.info("Predict peptide sequences with Casanovo.")
+        writer = ms_io.MztabWriter(f"{output}.mztab")
+        writer.set_metadata(config, model=model, config_filename=config.file)
+        model_runner.predict(peak_path, model, config, writer)
+        writer.save()
+
+
+
+
+
 
 def serialize_spectra(spectra: List[Tuple[float, float]]) -> str:
     mzs, ints = zip(*spectra)
@@ -150,8 +264,9 @@ with st.expander("files"):
 
 # Generate a temporary file name for the output (without creating a directory)
 output_file_path = str(uuid4().hex) + '.mztab'
-
+run_casanovo('denovo', None, mgf_file_path, None, yaml_file_path, output_file_path)
 # Run casanovo command setup
+"""
 casanovo_command = [
     'casanovo',
     '--mode=denovo',
@@ -159,6 +274,7 @@ casanovo_command = [
     f'--config={yaml_file_path}',
     f'--output={output_file_path}'
 ]
+
 
 st.write("Running casanovo...")
 result = subprocess.run(casanovo_command, capture_output=True, text=True)
@@ -180,6 +296,7 @@ else:
         st.code(result.stdout)
         st.code(result.stderr)
 
+"""
 
 
 # Display the output file
