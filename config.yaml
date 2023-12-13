@@ -25,7 +25,7 @@ remove_precursor_tol: 2.0  # Da
 max_charge: 10
 # Max absolute difference allowed with respect to observed precursor m/z (I)
 # Predictions outside the tolerance range are assinged a negative peptide score
-precursor_mass_tol: 50  # ppm
+precursor_mass_tol: 30  # ppm
 # Isotopes to consider when comparing predicted and observed precursor m/z's (I)
 isotope_error_range: [0, 1]
 # The minimum length of predicted peptides (I).
@@ -98,7 +98,7 @@ weight_decay: 1e-5
 # Number of spectra in one training batch
 train_batch_size: 32
 # Number of spectra in one inference batch (I)
-predict_batch_size: 1024
+predict_batch_size: 32
 # Number of beams used in beam search (I)
 n_beams: 5
 # Number of PSMs for each spectrum (I)

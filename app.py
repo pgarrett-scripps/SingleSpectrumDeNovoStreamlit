@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 import pandas as pd
 import streamlit as st
+import yaml
 from msms_compression import SpectrumCompressorUrlLzstring
 
 def serialize_spectra(spectra: List[Tuple[float, float]]) -> str:
@@ -21,10 +22,10 @@ def deserialize_spectra(s: str) -> List[Tuple[float, float]]:
 params = st.experimental_get_query_params()
 
 DEFAULT_PRECURSOR_MASS = 2022.9158
-query_precursor_mass = params.get('Precursor Mass', [str(DEFAULT_PRECURSOR_MASS)])[0]
+query_precursor_mz = params.get('Precursor Mass', [str(DEFAULT_PRECURSOR_MASS)])[0]
 try:
-    query_precursor_mass = float(query_precursor_mass)
-    if query_precursor_mass < 0:
+    query_precursor_mz = float(query_precursor_mz)
+    if query_precursor_mz < 0:
         ValueError("Precursor mass must be non-negative.")
 except ValueError:
     ValueError("Precursor mass must be a number.")
@@ -50,12 +51,47 @@ for s in query_spectra:
 st.title("Spectrum Denovo")
 
 
-precursor_mass = st.number_input("Precursor Mass", value=query_precursor_mass)
+precursor_mz = st.number_input("Precursor M/Z", value=query_precursor_mz)
 precursor_charge = st.number_input("Precursor Charge", value=query_precursor_charge)
 spectra = st.text_area(
             label='Spectra',
             value='\n'.join(f'{s[0]} {s[1]}' for s in query_spectra)
         )
+
+with st.expander("Advanced"):
+    predict_batch_size = st.number_input("Predict Batch Size", value=32)
+    n_beams = st.number_input("Number of Beams", value=5)
+    top_match = st.number_input("Top Match", value=10)
+    max_length = st.number_input("Max Length", value=100)
+    min_length = st.number_input("Min Length", value=6)
+    precursor_mass_tol = st.number_input("Precursor Mass Tolerance", value=30)
+
+
+def get_updated_config():
+    lines = []
+    with open('config.yaml', 'r') as f:
+        for line in f:
+            if line.startswith('predict_batch_size'):
+                line = f'predict_batch_size: {predict_batch_size}\n'
+            elif line.startswith('n_beams'):
+                line = f'n_beams: {n_beams}\n'
+            elif line.startswith('top_match'):
+                line = f'top_match: {top_match}\n'
+            elif line.startswith('max_length'):
+                line = f'max_length: {max_length}\n'
+            elif line.startswith('min_length'):
+                line = f'min_length: {min_length}\n'
+            elif line.startswith('precursor_mass_tol'):
+                line = f'precursor_mass_tol: {precursor_mass_tol}\n'
+            lines.append(line)
+
+    return ''.join(lines)
+
+updated_config = get_updated_config()
+
+with st.expander("Config"):
+    st.code(updated_config, language='yaml')
+
 
 if spectra:
     mzs, ints = [], []
@@ -74,6 +110,7 @@ else:
     spectra = []
 
 
+
 if not st.button("Run"):
     st.stop()
 
@@ -84,9 +121,9 @@ def get_mgf(spectra: List[Tuple[float, float]], precursor_mass: float, precursor
         f"PEPMASS={precursor_mass}",
         f"CHARGE={precursor_charge}+",
         "SCANS=F1:2478",
-        "RTINSECONDS=824.574",
-        "SEQ=IAHYNKR",
+        "SEQ=PEPTIDE",
         ]
+
     for mz, intensity in spectra:
         mgf_lines.append(f"{mz} {intensity}")
 
@@ -94,13 +131,15 @@ def get_mgf(spectra: List[Tuple[float, float]], precursor_mass: float, precursor
     return '\n'.join(mgf_lines)
 
 # Save mgf file to temporary file
-mgf = get_mgf(spectra, precursor_mass, precursor_charge)
+mgf = get_mgf(spectra, precursor_mz, precursor_charge)
 #st.code(mgf)
 with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.mgf') as mgf_file:
     mgf_file_path = mgf_file.name
     mgf_file.write(mgf)
 
-config_file = 'config.yaml'
+with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as yaml_file:
+    yaml_file_path = yaml_file.name
+    yaml_file.write(updated_config)
 
 # Run casanovo
 output_file_path = os.path.join(tempfile.mkdtemp(), 'output.mztab')  # Specify an output file, not a directory
@@ -108,12 +147,14 @@ casanovo_command = [
     'casanovo',
     '--mode=denovo',
     f'--peak_path={mgf_file_path}',
-    f'--config={config_file}',
+    f'--config={yaml_file_path}',
     f'--output={output_file_path}'
 ]
 
 st.write("Running casanovo...")
 result = subprocess.run(casanovo_command, capture_output=True, text=True)
+
+# stream output
 mz_tab_content = ''
 # Display casanovo output
 if result.returncode == 0:
@@ -169,12 +210,13 @@ def generate_app_url(sequence, spectra) -> str:
     query_string = '&'.join([f'{key}={value}' for key, value in params.items() if value is not None])
     return f'{base_url}?{query_string}'
 
+
 for i, row in psm_df.iterrows():
     url = generate_app_url(row['sequence'], spectra)
     st.markdown(f'[{row["sequence"]}]({url})')
 
-# loop over
 
 # Clean up temporary files
 os.remove(mgf_file_path)
 os.remove(output_file_path)
+os.remove(yaml_file_path)
