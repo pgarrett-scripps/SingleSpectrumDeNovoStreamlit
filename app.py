@@ -162,7 +162,7 @@ casanovo_command = [
 
 st.write("Running casanovo...")
 result = subprocess.run(casanovo_command, capture_output=True, text=True)
-
+st.info("casanovo finished running!, return code: " + str(result.returncode))
 # stream output
 mz_tab_content = ''
 # Display casanovo output
@@ -179,6 +179,7 @@ else:
     with st.expander("casanovo output"):
         st.code(result.stdout)
         st.code(result.stderr)
+
 
 
 # Display the output file
