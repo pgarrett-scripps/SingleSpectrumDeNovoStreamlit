@@ -178,6 +178,8 @@ else:
         st.code(result.stdout)
         st.code(result.stderr)
 
+    st.stop()
+
 
 # Extract only the lines starting with 'PSM'
 psm_lines = '\n'.join([line for line in mz_tab_content.split('\n') if line.startswith('PSM') or line.startswith('PSH')])
