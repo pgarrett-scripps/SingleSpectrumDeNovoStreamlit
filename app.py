@@ -141,8 +141,12 @@ with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as yaml
     yaml_file_path = yaml_file.name
     yaml_file.write(updated_config)
 
-# Run casanovo
-output_file_path = os.path.join(tempfile.mkdtemp(), 'output.mztab')  # Specify an output file, not a directory
+
+# Generate a temporary file name for the output (without creating a directory)
+_, output_file_path = tempfile.mkstemp(suffix='.mztab')
+os.close(_)  # Close the file descriptor immediately
+
+# Run casanovo command setup
 casanovo_command = [
     'casanovo',
     '--mode=denovo',
