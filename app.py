@@ -171,6 +171,7 @@ if result.returncode == 0:
 
     with st.expander("casanovo output"):
         st.code(result.stdout)
+        st.code(result.stderr)
 
     # Display the output file
     with open(output_file_path, 'r') as f:
@@ -182,6 +183,7 @@ else:
     with st.expander("casanovo output"):
         st.code(result.stdout)
         st.code(result.stderr)
+        st.code(mz_tab_content)
 
     st.stop()
 
