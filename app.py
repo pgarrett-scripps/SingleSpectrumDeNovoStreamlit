@@ -4,6 +4,7 @@ import tempfile
 import urllib
 from io import StringIO
 from typing import List, Tuple
+from uuid import uuid4
 
 import pandas as pd
 import streamlit as st
@@ -143,8 +144,7 @@ with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yaml') as yaml
 
 
 # Generate a temporary file name for the output (without creating a directory)
-_, output_file_path = tempfile.mkstemp(suffix='.mztab')
-os.close(_)  # Close the file descriptor immediately
+output_file_path = str(uuid4().hex) + '.mztab'
 
 # Run casanovo command setup
 casanovo_command = [
