@@ -1,7 +1,6 @@
 import datetime
 import logging
 import os
-import subprocess
 import sys
 import tempfile
 import urllib
@@ -12,7 +11,7 @@ from uuid import uuid4
 import github
 import pandas as pd
 import streamlit as st
-import yaml
+
 from casanovo import casanovo
 from casanovo.config import Config
 from casanovo.data import ms_io
@@ -20,6 +19,8 @@ from casanovo.denovo import model_runner
 from msms_compression import SpectrumCompressorUrlLzstring
 from casanovo.casanovo import _get_model_weights
 from pytorch_lightning.lite import LightningLite
+
+from constants import BASE_URL
 
 logger = logging.getLogger("casanovo")
 
@@ -266,6 +267,7 @@ with st.expander("files"):
 output_file_path = str(uuid4().hex) + '.mztab'
 run_casanovo('denovo', None, mgf_file_path, None, yaml_file_path, output_file_path)
 # Run casanovo command setup
+
 """
 casanovo_command = [
     'casanovo',
@@ -335,13 +337,12 @@ st.dataframe(psm_df)
 # loop over df and create links to spectrumviwer.streamlit.app
 
 def generate_app_url(sequence, spectra) -> str:
-    base_url = 'https://spectrum-viewer.streamlit.app/'
     params = {
         'sequence': urllib.parse.quote(sequence),
         'spectra': serialize_spectra(spectra),
     }
     query_string = '&'.join([f'{key}={value}' for key, value in params.items() if value is not None])
-    return f'{base_url}?{query_string}'
+    return f'{BASE_URL}?{query_string}'
 
 
 for i, row in psm_df.iterrows():
